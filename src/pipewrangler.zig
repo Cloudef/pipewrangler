@@ -1,5 +1,4 @@
 const std = @import("std");
-const log = std.log.scoped(.pipewrangler);
 const build_options = @import("build_options");
 
 const root = @import("root");
@@ -11,7 +10,6 @@ pub const Options = struct {
 };
 
 pub const wire = @import("wire.zig");
-
 pub const ReadError = wire.ReadError;
 pub const WriteError = wire.WriteError;
 
@@ -199,5 +197,6 @@ fn setNonBlock(fd: std.posix.fd_t, blocking: bool) error{FcntlFailed}!void {
 
 fn debug(comptime fmt: []const u8, args: anytype) void {
     if (!options.debug) return;
+    const log = std.log.scoped(.pipewrangler);
     log.debug(fmt, args);
 }

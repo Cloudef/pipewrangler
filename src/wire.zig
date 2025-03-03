@@ -3,12 +3,11 @@
 //! <https://docs.pipewire.org/page_native_protocol.html>
 
 const std = @import("std");
+const spa = @import("spa/spa.zig");
+const pod = spa.pod;
+const Pod = pod.Pod;
 
 pub const VERSION: u32 = 3;
-
-const spa = @import("spa.zig");
-const pod = @import("pod.zig");
-const Pod = pod.Pod;
 
 pub const ReadError = error{
     InvalidHeader,
@@ -92,7 +91,7 @@ pub const ServerFooter = struct {
         generation: Generation,
     };
 
-    footer: pod.wire.Struct,
+    footer: pod.types.Struct,
     index: usize = 0,
 
     pub fn init(footer: Pod) !@This() {
@@ -306,7 +305,7 @@ pub const Core = struct {
             _: u63,
         },
         /// Optional key/value properties, valid when change_mask has (1<<0)
-        props: pod.wire.Prop.Map,
+        props: pod.types.Prop.Map,
     };
 
     pub const Done = struct {
@@ -334,11 +333,11 @@ pub const Core = struct {
         /// A server allocated id for this memory
         id: Memory,
         /// The memory type, see enum spa_data_type
-        type: spa.param.DataType,
+        type: spa.wire.DataType,
         /// The index of the fd sent with this message
         fd: u64,
         /// Extra flags
-        flags: spa.DataFlags,
+        flags: spa.flags.Data,
     };
 
     pub const RemoveMem = struct {
@@ -351,7 +350,7 @@ pub const Core = struct {
         /// The global_id as it will appear in the registry
         global_id: Global,
         /// The properties of the global
-        props: pod.wire.Prop.Map,
+        props: pod.types.Prop.Map,
     };
 
     pub fn EventArgs(comptime event: Event) type {
@@ -435,7 +434,7 @@ pub const Client = struct {
     };
 
     pub const UpdateProperties = struct {
-        props: []const pod.wire.Prop,
+        props: []const pod.types.Prop,
     };
 
     pub const GetPermissions = struct {
@@ -470,14 +469,14 @@ pub const Client = struct {
             _: u63,
         },
         /// Properties of this object, valid when change_mask has (1<<0)
-        props: pod.wire.Prop.Map,
+        props: pod.types.Prop.Map,
     };
 
     pub const Permissions = struct {
         /// Index of the first permission
         index: i32,
         // The permission for the given id
-        permissions: pod.wire.IdPermission.List,
+        permissions: pod.types.IdPermission.List,
     };
 
     pub fn EventArgs(comptime event: Event) type {
@@ -523,10 +522,10 @@ pub const Registry = struct {
 
     pub const GlobalAdd = struct {
         id: Global,
-        permission: spa.Permission,
+        permission: spa.flags.Permission,
         type: [:0]const u8,
         version: u32,
-        props: pod.wire.Prop.Map,
+        props: pod.types.Prop.Map,
     };
 
     pub const GlobalRemove = struct {
@@ -604,14 +603,14 @@ pub const Device = struct {
 
     pub const SubscribeParams = struct {
         /// Array of param Ids to subscribe to
-        ids: []const spa.param.Type,
+        ids: []const spa.wire.ParamType,
     };
 
     pub const EnumParams = struct {
         /// An automatically generated sequence number, will be copied into the reply
         seq: i32,
         /// The param id to enumerate
-        id: spa.param.Type,
+        id: spa.wire.ParamType,
         /// The first param index to retrieve
         index: i32,
         /// The number of params to receive
@@ -622,9 +621,9 @@ pub const Device = struct {
 
     pub const SetParam = struct {
         /// The param id to set
-        id: spa.param.Type,
+        id: spa.wire.ParamType,
         /// Extra flags
-        flags: spa.ParamFlags,
+        flags: spa.flags.Param,
         /// The param object to set
         param: Pod,
     };
@@ -652,16 +651,16 @@ pub const Device = struct {
             _: u62,
         },
         /// Extra properties, valid when change_mask is (1<<0)
-        props: pod.wire.Prop.Map,
+        props: pod.types.Prop.Map,
         /// Info about the parameters, valid when change_mask is (1<<1) For each parameter, the id and current flags are given
-        param_infos: pod.wire.ParamInfo.Map,
+        param_infos: pod.types.ParamInfo.Map,
     };
 
     pub const Param = struct {
         /// The sequence number send by the client EnumParams or server generated in the SubscribeParams case
         seq: i32,
         /// The param id that is reported, see enum spa_param_type
-        id: spa.param.Type,
+        id: spa.wire.ParamType,
         /// The index of the parameter
         index: i32,
         /// The index of the next parameter
@@ -710,7 +709,7 @@ pub const Factory = struct {
             _: u63,
         },
         /// Optional properties of the factory, valid when change_mask is (1<<0)
-        props: pod.wire.Prop.Map,
+        props: pod.types.Prop.Map,
     };
 
     pub fn EventArgs(comptime event: Event) type {
@@ -758,7 +757,7 @@ pub const Link = struct {
         /// An optional format for the link, valid when change_mask has (1<<1)
         format: Pod,
         /// Optional properties of the link, valid when change_mask is (1<<2)
-        props: pod.wire.Prop.Map,
+        props: pod.types.Prop.Map,
     };
 
     pub fn EventArgs(comptime event: Event) type {
@@ -797,7 +796,7 @@ pub const Module = struct {
             _: u63,
         },
         /// Optional properties of the link, valid when change_mask is (1<<0)
-        props: pod.wire.Prop.Map,
+        props: pod.types.Prop.Map,
     };
 
     pub fn EventArgs(comptime event: Event) type {
@@ -879,14 +878,14 @@ pub const Node = struct {
 
     pub const SubscribeParams = struct {
         // Array of param Ids to subscribe to
-        ids: []const spa.param.Type,
+        ids: []const spa.wire.ParamType,
     };
 
     pub const EnumParams = struct {
         /// An automatically generated sequence number, will be copied into the reply
         seq: u32,
         /// The param id to enumerate
-        id: spa.param.Type,
+        id: spa.wire.ParamType,
         /// The first param index to retrieve
         index: u32,
         /// The number of params to retrieve
@@ -897,9 +896,9 @@ pub const Node = struct {
 
     pub const SetParam = struct {
         /// The param id to set
-        id: spa.param.Type,
+        id: spa.wire.ParamType,
         /// Extra flags
-        flags: spa.ParamFlags,
+        flags: spa.flags.Param,
         /// The param object to set
         param: Pod,
     };
@@ -943,16 +942,16 @@ pub const Node = struct {
         /// An error message
         @"error": ?[:0]const u8,
         /// Extra properties, valid when change_mask is (1<<3)
-        props: pod.wire.Prop.Map,
+        props: pod.types.Prop.Map,
         /// Info about the parameters, valid when change_mask is (1<<4) For each parameter, the id and current flags are given
-        param_infos: pod.wire.ParamInfo.Map,
+        param_infos: pod.types.ParamInfo.Map,
     };
 
     pub const Param = struct {
         /// The sequence number send by the client EnumParams or server generated in the SubscribeParams case.
         seq: u32,
         /// The param id that is reported, see enum spa_param_type
-        id: spa.param.Type,
+        id: spa.wire.ParamType,
         /// The index of the parameter
         index: u32,
         /// The index of the next parameter
@@ -986,7 +985,7 @@ pub const Port = struct {
         @"audio.channel": ?[:0]const u8,
         @"port.id": ?Global,
         @"port.name": ?[:0]const u8,
-        @"port.direction": ?spa.param.Direction,
+        @"port.direction": ?spa.wire.Direction,
         @"port.physical": ?bool,
         @"port.terminal": ?bool,
         @"port.monitor": ?bool,
@@ -1001,14 +1000,14 @@ pub const Port = struct {
 
     pub const SubscribeParams = struct {
         /// Array of param Ids to subscribe to
-        ids: []const spa.param.Type,
+        ids: []const spa.wire.ParamType,
     };
 
     pub const EnumParams = struct {
         /// An automatically generated sequence number, will be copied into the reply
         seq: u32,
         /// The param id to enumerate
-        id: spa.param.Type,
+        id: spa.wire.ParamType,
         /// The first param index to retrieve
         index: u32,
         /// The number of params to retrieve
@@ -1033,7 +1032,7 @@ pub const Port = struct {
         /// The global id of the port
         id: Global,
         /// The direction of the port, see enum pw_direction
-        direction: spa.param.Direction,
+        direction: spa.wire.Direction,
         /// Bitfield of changed values
         change_mask: packed struct(u64) {
             props: bool,
@@ -1041,16 +1040,16 @@ pub const Port = struct {
             _: u62,
         },
         /// Extra properties, valid when change_mask is (1<<0)
-        props: pod.wire.Prop.Map,
+        props: pod.types.Prop.Map,
         /// Info about the parameters, valid when change_mask is (1<<1) For each parameter, the id and current flags are given
-        param_infos: pod.wire.ParamInfo.Map,
+        param_infos: pod.types.ParamInfo.Map,
     };
 
     pub const Param = struct {
         /// The sequence number send by the client EnumParams or server generated in the SubscribeParams case.
         seq: u32,
         /// The param id that is reported, see enum spa_param_type
-        id: spa.param.Type,
+        id: spa.wire.ParamType,
         /// The index of the parameter
         index: u32,
         /// The index of the next parameter
@@ -1115,14 +1114,14 @@ pub const ClientNode = struct {
                 _: u61,
             },
             flags: u64,
-            props: []const pod.wire.Prop,
-            params: []const pod.wire.ParamInfo,
+            props: []const pod.types.Prop,
+            params: []const pod.types.ParamInfo,
         },
     };
 
     pub const PortUpdate = struct {
-        direction: spa.param.Direction,
-        port_id: pod.wire.Id,
+        direction: spa.wire.Direction,
+        port_id: pod.types.Id,
         change_mask: packed struct(u32) {
             params: bool,
             info: bool,
@@ -1141,8 +1140,8 @@ pub const ClientNode = struct {
             flags: u64,
             rate_num: u32,
             rate_denom: u32,
-            props: []const pod.wire.Prop,
-            params: []const pod.wire.ParamInfo,
+            props: []const pod.types.Prop,
+            params: []const pod.types.ParamInfo,
         },
     };
 
@@ -1155,9 +1154,9 @@ pub const ClientNode = struct {
     };
 
     pub const PortBuffers = struct {
-        direction: spa.param.Direction,
-        port_id: pod.wire.Id,
-        mix_id: pod.wire.Id,
+        direction: spa.wire.Direction,
+        port_id: pod.types.Id,
+        mix_id: pod.types.Id,
         // TODO: n_buffers struct here ..
     };
 
@@ -1188,8 +1187,8 @@ pub const ClientNode = struct {
     };
 
     pub const Transport = struct {
-        read_fd: pod.wire.Fd,
-        write_fd: pod.wire.Fd,
+        read_fd: pod.types.Fd,
+        write_fd: pod.types.Fd,
         memfd: u32,
         offset: u32,
         size: u32,
@@ -1197,15 +1196,15 @@ pub const ClientNode = struct {
 
     pub const SetParam = struct {
         /// The param id to set
-        id: spa.param.Type,
+        id: spa.wire.ParamType,
         /// Extra flags
-        flags: spa.ParamFlags,
+        flags: spa.flags.Param,
         /// The param object to set
         param: Pod,
     };
 
     pub const SetIo = struct {
-        id: spa.param.IoType,
+        id: spa.wire.IoType,
         memid: u32,
         offset: u32,
         size: u32,
@@ -1216,56 +1215,56 @@ pub const ClientNode = struct {
     };
 
     pub const AddPort = struct {
-        direction: spa.param.Direction,
-        port_id: pod.wire.Id,
-        props: []const pod.wire.Prop,
+        direction: spa.wire.Direction,
+        port_id: pod.types.Id,
+        props: []const pod.types.Prop,
     };
 
     pub const RemovePort = struct {
-        direction: spa.param.Direction,
-        port_id: pod.wire.Id,
+        direction: spa.wire.Direction,
+        port_id: pod.types.Id,
     };
 
     pub const PortSetParam = struct {
-        direction: spa.param.Direction,
-        port_id: pod.wire.Id,
-        id: spa.param.Type,
+        direction: spa.wire.Direction,
+        port_id: pod.types.Id,
+        id: spa.wire.ParamType,
         flags: u32,
         param: Pod,
     };
 
     pub const UseBuffers = struct {
-        direction: spa.param.Direction,
-        port_id: pod.wire.Id,
-        mix_id: pod.wire.Id,
-        flags: pod.wire.Id,
+        direction: spa.wire.Direction,
+        port_id: pod.types.Id,
+        mix_id: pod.types.Id,
+        flags: pod.types.Id,
         // TODO: n_buffers struct here ..
     };
 
     pub const PortSetIo = struct {
-        direction: spa.param.Direction,
-        port_id: pod.wire.Id,
-        mix_id: pod.wire.Id,
-        id: spa.param.IoType,
+        direction: spa.wire.Direction,
+        port_id: pod.types.Id,
+        mix_id: pod.types.Id,
+        id: spa.wire.IoType,
         memid: u32,
         offset: u32,
         size: u32,
     };
 
     pub const SetActivation = struct {
-        node_id: pod.wire.Id,
-        signal_fd: pod.wire.Fd,
+        node_id: pod.types.Id,
+        signal_fd: pod.types.Fd,
         memid: u32,
         offset: u32,
         size: u32,
     };
 
     pub const PortSetMixInfo = struct {
-        direction: spa.param.Direction,
-        port_id: pod.wire.Id,
-        mix_id: pod.wire.Id,
-        peer_id: pod.wire.Id,
-        props: []const pod.wire.Prop,
+        direction: spa.wire.Direction,
+        port_id: pod.types.Id,
+        mix_id: pod.types.Id,
+        peer_id: pod.types.Id,
+        props: []const pod.types.Prop,
     };
 
     pub fn EventArgs(comptime event: Event) type {
@@ -1433,7 +1432,7 @@ pub const Extension = enum {
                 try Pod.write(payload, counter.writer());
             },
         };
-        const header: pod.wire.Header = .{
+        const header: pod.types.Header = .{
             .type = .@"struct",
             .size = @intCast(counter.bytes_written),
         };

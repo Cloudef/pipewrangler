@@ -1,26 +1,11 @@
-pub const Object = enum(u32) {
-    prop_info = 0x40001,
-    props,
-    media_format,
-    buffers,
-    meta,
-    io,
-    profile,
-    port_config,
-    route,
-    profiler,
-    latency,
-    process_latency,
-    tag,
+pub const Param = packed struct(u32) {
+    serial: bool,
+    read: bool,
+    write: bool,
+    _: u29,
 };
 
-pub const param = @import("spa/param.zig");
-pub const audio = @import("spa/audio.zig");
-
-// TODO: Move things to their own namespaces
-// TODO: Consider generating most of this from pipewire source
-
-pub const AllocFlags = packed struct(u32) {
+pub const Alloc = packed struct(u32) {
     /// add metadata data in the skeleton
     inline_meta: bool,
     /// add chunk data in the skeleton
@@ -38,14 +23,14 @@ pub const AllocFlags = packed struct(u32) {
     };
 };
 
-pub const ChunkFlags = packed struct(u32) {
+pub const Chunk = packed struct(u32) {
     /// chunk data is corrupted in some way
     corrupted: bool,
     /// chunk data is empty with media specific neutral data such as silence or black
     empty: bool,
 };
 
-pub const DataFlags = packed struct(u32) {
+pub const Data = packed struct(u32) {
     /// data is readable
     readable: bool,
     /// data is writable
@@ -61,7 +46,7 @@ pub const DataFlags = packed struct(u32) {
     }
 };
 
-pub const MetaHeaderFlags = packed struct(u32) {
+pub const MetaHeader = packed struct(u32) {
     /// data is not continuous with previous buffer
     discont: bool,
     /// data might be corrupted
@@ -76,26 +61,6 @@ pub const MetaHeaderFlags = packed struct(u32) {
     delta_unit: bool,
 };
 
-pub const MetaVideoTranform = enum(u32) {
-    /// no transform
-    none,
-    /// 90 degree counter-clockwise
-    ccw_90,
-    /// 180 degree counter-clockwise
-    ccw_180,
-    /// 270 degree counter-clockwise
-    ccw_270,
-    /// 180 degree flipped around the vertical axis
-    /// Equivalent to a reflexion through the vertical line splitting the buffer in two equal sized parts
-    flipped,
-    /// flip then rotate around 90 degree counter-clockwise
-    flipped_ccw_90,
-    /// flip then rotate around 180 degree counter-clockwise
-    flipped_ccw_180,
-    /// flip then rotate around 270 degree counter-clockwise
-    flipped_ccw_270,
-};
-
 pub const Permission = packed struct(u32) {
     _0: u2,
     metadata: bool,
@@ -105,4 +70,9 @@ pub const Permission = packed struct(u32) {
     write: bool,
     read: bool,
     _2: u23,
+};
+
+pub const Audio = packed struct(u32) {
+    unpositioned: bool,
+    _: u31,
 };

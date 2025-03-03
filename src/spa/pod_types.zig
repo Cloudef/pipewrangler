@@ -1,38 +1,16 @@
 const std = @import("std");
-const spa = @import("../spa.zig");
-const Pod = @import("../pod.zig").Pod;
-
-pub const Type = enum(u32) {
-    none = 1,
-    bool,
-    id,
-    int,
-    long,
-    float,
-    double,
-    string,
-    bytes,
-    rectangle,
-    fraction,
-    bitmap,
-    array,
-    @"struct",
-    object,
-    sequence,
-    pointer,
-    fd,
-    choice,
-};
+const spa = @import("spa.zig");
+const Pod = @import("pod.zig").Pod;
 
 pub const Header = extern struct {
     size: u32,
-    type: Type,
+    type: Pod.Type,
 
     pub fn read(reader: anytype) !@This() {
         var header: @This() = undefined;
         _ = try reader.readAll(std.mem.asBytes(&header));
-        if (@intFromEnum(header.type) < @intFromEnum(Type.none)) return error.InvalidPodHeader;
-        if (@intFromEnum(header.type) > @intFromEnum(Type.choice)) return error.InvalidPodHeader;
+        if (@intFromEnum(header.type) < @intFromEnum(Pod.Type.none)) return error.InvalidPodHeader;
+        if (@intFromEnum(header.type) > @intFromEnum(Pod.Type.choice)) return error.InvalidPodHeader;
         return header;
     }
 };
@@ -539,7 +517,7 @@ pub const Bitmap = struct {
     }
 };
 
-pub const Array = union(Type) {
+pub const Array = union(Pod.Type) {
     none: void,
     bool: []const Bool,
     id: []const Id,
@@ -559,6 +537,7 @@ pub const Array = union(Type) {
     pointer: []const Pointer,
     fd: []const Fd,
     choice: void,
+    pod: void,
 
     pub fn read(arena: std.mem.Allocator, size: u32, reader: anytype) !@This() {
         var child_size: u32 = undefined;
@@ -566,7 +545,7 @@ pub const Array = union(Type) {
         if (try reader.readAll(std.mem.asBytes(&child_size)) != 4) return error.InvalidArray;
         if (try reader.readAll(std.mem.asBytes(&child_type)) != 4) return error.InvalidArray;
         const array_size = size - 8;
-        inline for (std.meta.fields(Type)) |field| {
+        inline for (std.meta.fields(Pod.Type)) |field| {
             const Field = @FieldType(@This(), field.name);
             if (Field != void and field.value == child_type) {
                 const Child = std.meta.Child(Field);
@@ -713,7 +692,7 @@ pub const Struct = struct {
     }
 };
 
-pub const Object = union(spa.Object) {
+pub const Object = union(spa.id.Object) {
     pub const AnyProperty = struct {
         key: u32,
         flags: u32,
@@ -735,17 +714,17 @@ pub const Object = union(spa.Object) {
     fn Property(T: anytype) type {
         return struct {
             id: Id,
-            props: []const T.Union,
+            props: []const T,
 
             pub fn read(arena: std.mem.Allocator, id: Id, size: u32, reader: anytype) !@This() {
                 var counter = std.io.countingReader(reader);
-                var props: std.ArrayListUnmanaged(T.Union) = .empty;
+                var props: std.ArrayListUnmanaged(T) = .empty;
                 errdefer props.deinit(arena);
                 while (counter.bytes_read < size) {
                     var any: AnyProperty = try .read(arena, size, counter.reader());
-                    inline for (std.meta.fields(T)) |field| {
+                    inline for (std.meta.fields(std.meta.Tag(T))) |field| {
                         if (field.value == any.key) {
-                            try props.append(arena, @unionInit(T.Union, field.name, try any.pod.map(@FieldType(T.Union, field.name))));
+                            try props.append(arena, @unionInit(T, field.name, try any.pod.map(@FieldType(T, field.name))));
                         }
                     }
                 }
@@ -776,25 +755,25 @@ pub const Object = union(spa.Object) {
     }
 
     prop_info: Property(spa.param.PropInfo),
-    props: Property(spa.param.Props),
-    media_format: Property(spa.param.MediaFormat),
-    buffers: Property(spa.param.Buffers),
-    meta: Property(spa.param.Meta),
-    io: Property(spa.param.Io),
-    profile: Property(spa.param.Profile),
-    port_config: Property(spa.param.PortConfig),
-    route: Property(spa.param.Route),
+    props: Property(spa.param.Prop),
+    media_format: Property(spa.param.Format),
+    param_buffers: Property(spa.param.Buffers),
+    param_meta: Property(spa.param.Meta),
+    param_io: Property(spa.param.Io),
+    param_profile: Property(spa.param.Profile),
+    param_port_config: Property(spa.param.PortConfig),
+    param_route: Property(spa.param.Route),
     profiler: Property(spa.param.Profile),
-    latency: Property(spa.param.Latency),
-    process_latency: Property(spa.param.ProcessLatency),
-    tag: Property(spa.param.Tag),
+    param_latency: Property(spa.param.Latency),
+    param_process_latency: Property(spa.param.ProcessLatency),
+    param_tag: Property(spa.param.Tag),
 
     pub fn read(arena: std.mem.Allocator, size: u32, reader: anytype) !@This() {
         var id: Id = undefined;
         var raw_type: u32 = undefined;
         if (try reader.readAll(std.mem.asBytes(&raw_type)) != 4) return error.InvalidObject;
         if (try reader.readAll(std.mem.asBytes(&id)) != 4) return error.InvalidObject;
-        const obj_type = std.meta.intToEnum(spa.Object, raw_type) catch return error.InvalidObject;
+        const obj_type = std.meta.intToEnum(spa.id.Object, raw_type) catch return error.InvalidObject;
         const props_size = size - 8;
         var buf = try arena.alloc(u8, props_size);
         errdefer arena.free(buf);
@@ -963,7 +942,7 @@ pub const Choice = struct {
         if (try reader.readAll(std.mem.asBytes(&child_size)) != 4) return error.InvalidChoice;
         if (try reader.readAll(std.mem.asBytes(&child_raw_type)) != 4) return error.InvalidChoice;
 
-        const child_type = std.meta.intToEnum(Type, child_raw_type) catch return error.InvalidChoice;
+        const child_type = std.meta.intToEnum(Pod.Type, child_raw_type) catch return error.InvalidChoice;
         const array_size = size - 16;
         const n_items = array_size / child_size;
 
@@ -1035,7 +1014,29 @@ pub const Choice = struct {
     }
 };
 
-pub fn PodMap(comptime Key: Type, comptime Value: Type, comptime Tag: ?type, KV: type) type {
+pub const Self = struct {
+    pub fn read(_: std.mem.Allocator, _: u32, _: anytype) !@This() {
+        unreachable;
+    }
+
+    pub fn write(_: void, _: anytype) !void {
+        unreachable;
+    }
+
+    pub fn writeSelf(_: @This(), _: anytype) !void {
+        unreachable;
+    }
+
+    pub fn map(_: @This(), T: type) !T {
+        unreachable;
+    }
+
+    pub fn format(_: @This(), comptime _: []const u8, _: std.fmt.FormatOptions, writer: anytype) !void {
+        try writer.writeAll("Self");
+    }
+};
+
+pub fn PodMap(comptime Key: Pod.Type, comptime Value: Pod.Type, comptime Tag: ?type, KV: type) type {
     return struct {
         fields: []const Pod,
 
@@ -1156,7 +1157,7 @@ pub fn PodMap(comptime Key: Type, comptime Value: Type, comptime Tag: ?type, KV:
     };
 }
 
-pub fn PodList(comptime Key: Type, comptime Value: Type, KV: type) type {
+pub fn PodList(comptime Key: Pod.Type, comptime Value: Pod.Type, KV: type) type {
     return struct {
         fields: []const Pod,
 
@@ -1229,10 +1230,10 @@ pub const Prop = struct {
 };
 
 pub const ParamInfo = struct {
-    pub const Map = PodMap(.id, .int, spa.param.Type, @This());
+    pub const Map = PodMap(.id, .int, spa.wire.ParamType, @This());
 
-    id: spa.param.Type,
-    flags: spa.param.InfoFlags,
+    id: spa.wire.ParamType,
+    flags: spa.flags.Param,
 
     pub fn format(self: @This(), comptime _: []const u8, _: std.fmt.FormatOptions, writer: anytype) !void {
         try writer.print("{} = {}", .{ self.id, self.flags });
@@ -1248,7 +1249,7 @@ pub const IdPermission = struct {
     pub const List = PodList(.id, .int, @This());
 
     id: Id,
-    permission: spa.Permission,
+    permission: spa.flags.Permission,
 
     pub fn format(self: @This(), comptime _: []const u8, _: std.fmt.FormatOptions, writer: anytype) !void {
         try writer.print("{} = {}", .{ self.id, self.permission });

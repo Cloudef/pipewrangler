@@ -1,9 +1,9 @@
 //! Pipewire POD type
-//! <https://docs.pipewire.org/page_spa_pod.html>
+//! <https://docs.pipetypes.org/page_spa_pod.html>
 
 const std = @import("std");
 const spa = @import("spa.zig");
-pub const wire = @import("pod/wire.zig");
+pub const types = @import("pod_types.zig");
 
 pub const MapError = error{
     InvalidMap,
@@ -39,28 +39,30 @@ pub const ReadError = error{
 
 pub const WriteError = std.net.Stream.WriteError;
 
-pub const Pod = union(wire.Type) {
-    none: wire.None,
-    bool: wire.Bool,
-    id: wire.Id,
-    int: wire.Int,
-    long: wire.Long,
-    float: wire.Float,
-    double: wire.Double,
-    string: wire.String,
-    bytes: wire.Bytes,
-    rectangle: wire.Rectangle,
-    fraction: wire.Fraction,
-    bitmap: wire.Bitmap,
-    array: wire.Array,
-    @"struct": wire.Struct,
-    object: wire.Object,
-    sequence: wire.Sequence,
-    pointer: wire.Pointer,
-    fd: wire.Fd,
-    choice: wire.Choice,
+pub const Pod = union(spa.id.Pod) {
+    pub const Type = spa.id.Pod;
+    none: types.None,
+    bool: types.Bool,
+    id: types.Id,
+    int: types.Int,
+    long: types.Long,
+    float: types.Float,
+    double: types.Double,
+    string: types.String,
+    bytes: types.Bytes,
+    rectangle: types.Rectangle,
+    fraction: types.Fraction,
+    bitmap: types.Bitmap,
+    array: types.Array,
+    @"struct": types.Struct,
+    object: types.Object,
+    sequence: types.Sequence,
+    pointer: types.Pointer,
+    fd: types.Fd,
+    choice: types.Choice,
+    pod: types.Self,
 
-    pub fn readType(arena: std.mem.Allocator, kind: wire.Type, size: u32, aligned: enum { align_after, dont_align }, reader: anytype) ReadError!@This() {
+    pub fn readType(arena: std.mem.Allocator, kind: Type, size: u32, aligned: enum { align_after, dont_align }, reader: anytype) ReadError!@This() {
         switch (kind) {
             inline else => |tag| {
                 const WireType = @FieldType(@This(), @tagName(tag));
@@ -75,17 +77,17 @@ pub const Pod = union(wire.Type) {
     }
 
     pub fn read(arena: std.mem.Allocator, size: u24, reader: anytype) ReadError!@This() {
-        if (size < @sizeOf(wire.Header)) return error.InvalidPod;
-        const header = try wire.Header.read(reader);
+        if (size < @sizeOf(types.Header)) return error.InvalidPod;
+        const header = try types.Header.read(reader);
         return readType(arena, header.type, header.size, .align_after, reader);
     }
 
     pub fn map(self: @This(), T: type) MapError!T {
         return switch (T) {
             Pod => self,
-            wire.Prop.Map,
-            wire.ParamInfo.Map,
-            wire.IdPermission.List,
+            types.Prop.Map,
+            types.ParamInfo.Map,
+            types.IdPermission.List,
             => .init(self),
             else => switch (self) {
                 inline else => |pod| pod.map(T),
@@ -102,9 +104,13 @@ pub const Pod = union(wire.Type) {
     pub fn write(val: anytype, writer: anytype) WriteError!void {
         switch (@TypeOf(val)) {
             Pod => try val.writeSelf(writer),
-            wire.Id, spa.param.Type => try wire.Id.write(val, writer),
-            wire.Fd => try wire.Fd.write(val, writer),
-            []const wire.Prop => {
+            types.Id,
+            spa.id.Pod,
+            spa.id.Object,
+            spa.wire.ParamType,
+            => try types.Id.write(val, writer),
+            types.Fd => try types.Fd.write(val, writer),
+            []const types.Prop => {
                 var counter = std.io.countingWriter(std.io.null_writer);
                 const len: u32 = @intCast(val.len);
                 try write(len, counter.writer());
@@ -112,7 +118,7 @@ pub const Pod = union(wire.Type) {
                     try write(kv.key, counter.writer());
                     try write(kv.value, counter.writer());
                 }
-                const header: wire.Header = .{
+                const header: types.Header = .{
                     .type = .@"struct",
                     .size = @intCast(counter.bytes_written),
                 };
@@ -123,7 +129,7 @@ pub const Pod = union(wire.Type) {
                     try write(kv.value, writer);
                 }
             },
-            []const wire.IdPermission => {
+            []const types.IdPermission => {
                 var counter = std.io.countingWriter(std.io.null_writer);
                 const len: u32 = @intCast(val.len);
                 try write(len, counter.writer());
@@ -131,7 +137,7 @@ pub const Pod = union(wire.Type) {
                     try write(kv.id, counter.writer());
                     try write(kv.permission, counter.writer());
                 }
-                const header: wire.Header = .{
+                const header: types.Header = .{
                     .type = .@"struct",
                     .size = @intCast(counter.bytes_written),
                 };
@@ -143,13 +149,13 @@ pub const Pod = union(wire.Type) {
                 }
             },
             else => |T| switch (@typeInfo(T)) {
-                .void => try wire.None.write(val, writer),
-                .bool => try wire.Bool.write(val, writer),
+                .void => try types.None.write(val, writer),
+                .bool => try types.Bool.write(val, writer),
                 .int => |ti| {
                     if (ti.bits <= 32) {
-                        try wire.Int.write(@intCast(val), writer);
+                        try types.Int.write(@intCast(val), writer);
                     } else if (ti.bits <= 64) {
-                        try wire.Long.write(@intCast(val), writer);
+                        try types.Long.write(@intCast(val), writer);
                     } else {
                         @compileError("integers larger than 64 bits cannot be written");
                     }
@@ -160,9 +166,9 @@ pub const Pod = union(wire.Type) {
                 },
                 .float => |ti| {
                     if (ti.bits <= 32) {
-                        try wire.Float.write(@floatCast(val), writer);
+                        try types.Float.write(@floatCast(val), writer);
                     } else if (ti.bits <= 64) {
-                        try wire.Double.write(@floatCast(val), writer);
+                        try types.Double.write(@floatCast(val), writer);
                     } else {
                         @compileError("floats larger than 64 bits cannot be written");
                     }
@@ -171,31 +177,31 @@ pub const Pod = union(wire.Type) {
                     .slice => switch (ti.child) {
                         u8 => {
                             if (ti.sentinel() == 0) {
-                                try wire.String.write(val, writer);
+                                try types.String.write(val, writer);
                             } else {
-                                try wire.Bytes.write(val, writer);
+                                try types.Bytes.write(val, writer);
                             }
                         },
-                        else => try wire.Array.write(val, writer),
+                        else => try types.Array.write(val, writer),
                     },
-                    else => try wire.Pointer.write(val, writer),
+                    else => try types.Pointer.write(val, writer),
                 },
                 .array => |ti| switch (ti.child) {
                     u8 => {
                         if (ti.sentinel() == 0) {
-                            try wire.String.write(val[0.. :0], writer);
+                            try types.String.write(val[0.. :0], writer);
                         } else {
-                            try wire.Bytes.write(val[0..], writer);
+                            try types.Bytes.write(val[0..], writer);
                         }
                     },
-                    else => try wire.Array.write(val[0..], writer),
+                    else => try types.Array.write(val[0..], writer),
                 },
                 .@"struct" => |ti| switch (ti.layout) {
                     .@"packed" => {
                         const int: ti.backing_integer.? = @bitCast(val);
                         try write(int, writer);
                     },
-                    else => try wire.Struct.write(val, writer),
+                    else => try types.Struct.write(val, writer),
                 },
                 .optional => switch (val) {
                     null => try write({}, writer),

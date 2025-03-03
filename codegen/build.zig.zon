@@ -1,0 +1,15 @@
+.{
+    .name = "pwcodegen",
+    .version = "0.0.0",
+    .dependencies = .{
+        .pipewire = .{
+            .url = "git+https://github.com/PipeWire/pipewire.git#398914e609432f189115444b5c9538303e6d847c",
+            .hash = "1220da2e27188a26a14753adaaf2919887c943e9926e68276ea9c9bb5b47aadf62e6",
+        },
+    },
+    .paths = .{
+        "build.zig",
+        "build.zig.zon",
+        "src",
+    },
+}
